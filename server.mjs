@@ -43,7 +43,7 @@ export function createDomain(path=':memory:',options={}) {
       db.prepare('UPDATE products SET stock=stock+1 WHERE sku=?').run(r.sku);
       db.prepare('UPDATE reservations SET active=0 WHERE case_id=?').run(r.case_id);
       const c=one(r.case_id);
-      if(c&&c.status==='RESERVED')set(c.id,{status:'EXPIRED'});
+      if(c&&['RESERVED','RECEIVED'].includes(c.status))set(c.id,{status:'EXPIRED'});
       note(r.case_id,'HOLD_EXPIRED',{sku:r.sku});
     }
   };
@@ -119,7 +119,7 @@ export function createDomain(path=':memory:',options={}) {
         const old= db.prepare('SELECT * FROM replacements WHERE case_id=?').get(id);
         if(!old){
           const orderId='REPL-'+randomUUID().slice(0,12).toUpperCase();
-          db.prepare('INSERT INTO replacements VALUES(?,?,?,?,?,?)').run(orderId,id,c.order_id,c.selected_sku,1,'exchange:'+id,0);
+          db.prepare('INSERT INTO replacements VALUES(?,?,?,?,?,?,?)').run(orderId,id,c.order_id,c.selected_sku,1,'exchange:'+id,0);
         }
         if(data.simulateFailure===true)fail(503,'Simulated failure: transaction rolled back, retry is safe');
         const created=db.prepare('SELECT * FROM replacements WHERE case_id=?').get(id);

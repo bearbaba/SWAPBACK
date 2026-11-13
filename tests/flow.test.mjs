@@ -54,3 +54,15 @@ test('mismatched return is sent for review and cannot fulfill',async t=>{
   assert.equal(mismatch.status,'REVIEW');
   assert.equal((await api('cases/'+id+'/fulfill','warehouse','alice',{})).status,409);
 });
+
+
+test('expired hold returns stock to the pool and forbids fulfillment',async t=>{
+  const api=await pilot(t,1);
+  const id=await ready(api,'O100','alice');
+  await api('cases/'+id+'/choose','buyer','alice',{sku:'DOCK-PRO'});
+  await new Promise(resolve=>setTimeout(resolve,15));
+  const current=(await api('state')).data;
+  assert.equal(current.products.find(p=>p.sku==='DOCK-PRO').stock,1);
+  assert.equal((await api('cases/'+id)).data.status,'EXPIRED');
+  assert.equal((await api('cases/'+id+'/fulfill','warehouse','alice',{})).status,409);
+});
