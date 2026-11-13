@@ -1,66 +1,29 @@
 # SWAPBACK
 
-An exchange workspace connecting purchase-time promises, buyer choice and warehouse receipt to a replacement order.
+Runnable **local SQLite exchange pilot**: buyer claim → store reply → purchase-time evidence freeze → **manual fixture decision** → buyer-selected compatible SKU → atomic hold → matching return → one replacement order → readback.
 
-Buyer claim → store response → buyer-selected replacement → frozen evidence → GenLayer decision → matching return → replacement order.
+**Status (2026-11-13):** Actual source, dashboard and HTTP tests are now committed. The previous README described files that were absent from `main`; those claims are corrected. This is **not yet** a live WooCommerce or GenLayer integration.
 
-## Implementation status
+## Run
 
-The repository contains a runnable local workflow, responsive frontend, persistent SQLite backend, wallet-session authentication, GenLayer Intelligent Contract source, service integration code and automated tests. The local demo uses explicitly selected fixture decisions. Live operation requires deployment and credentials.
-
-| Component | Status |
-| --- | --- |
-| Application and local workflow | Implemented and tested through HTTP |
-| GenLayer contract | Source supplied; live deployment and consensus evidence pending |
-| Wallet sign-in | Signature validation and single-use nonce tests pass |
-| WooCommerce adapter | Implemented; external integration acceptance pending |
-| Public deployment | Pending |
-| Browser visual and wallet E2E | Pending; the available browser could not reach the isolated local server |
-
-## Run the local demo
-
-Requires Node.js 24 or newer.
+Node.js 24+, no third-party runtime packages:
 
 ```bash
-npm ci
-npm run build
 npm run demo
+npm test
 ```
 
-Open `http://127.0.0.1:4200`. Demo mode binds to loopback and stores synthetic records in `data/demo.sqlite`. The role selector is available only in this mode. Decisions are manually selected fixtures and are visibly labeled throughout the interface. Demo and live databases are separate.
+Open http://127.0.0.1:4200. Loopback only. Persistent demo DB: `data/swapback.sqlite`. Demo role and buyer headers are *not authentication*; non-demo mode fails closed.
 
-### Walk through an exchange
+## Evidence walkthrough
 
-1. As **Buyer**, submit a claim and select **DOCK-PRO**.
-2. Switch to **Warehouse**, add the store response and freeze evidence.
-3. Select the **EXCHANGE_ELIGIBLE** test fixture.
-4. As Buyer, reserve the replacement. As Warehouse, confirm matching returned goods.
-5. Create the replacement, then inspect **Inventory & orders**. Repeated fulfillment returns the original order.
+- **O100** belongs to alice; **O101** belongs to bob. Both bought DOCK-OLD advertised with USB4.
+- Warehouse offers DOCK-LITE (no USB4) and DOCK-PRO (USB4, only one available).
+- Buyer chooses a compatible SKU only after a frozen record and manually selected ELIGIBLE verdict.
+- Two competing claims for the final DOCK-PRO can only hold one item. Warehouse verifies returned goods before creating replacement.
+- Inject `simulateFailure:true` into fulfillment, retry, and observe exactly one replacement row; repeated success returns the same order.
+- Reservation expires after 15 minutes; read `/api/state` to trigger automatic release.
 
-## Live setup
+API: `GET /api/state`, `POST /api/cases`, `GET /api/cases/:id`, `POST /api/cases/:id/respond|freeze|decide|choose|receive|fulfill`.
 
-1. Copy `.env.example` to `.env` and configure the operator wallet, service credentials and explicit wallet roster.
-2. Deploy [`contracts/ExchangeCourt.py`](contracts/ExchangeCourt.py) on GenLayer Studionet with that operator wallet. Set `CONTRACT_ADDRESS` to the resulting address.
-3. Run `npm start` and sign in with the appropriate wallet. Configure Studionet chain ID `61999` in the wallet.
-4. Import a real source record using the operator account. Collect participant statements and freeze the snapshot.
-5. Operator signs `open_case(key, subject, snapshot)`. After it finalizes, a participant signs `adjudicate(key)`.
-6. Use **Verify final state**. The server reads `LATEST_FINAL`, checks operator binding, case identity, subject and the exact snapshot SHA-256.
-7. Execute the permitted action. A fresh chain read is required before an external write, followed by service readback.
-
-The contract deployer is the registered operator. Application statements are authenticated through wallet sessions and attested to chain by that operator. Individual statements are not separate on-chain signatures. Chain snapshots contain the supplied evidence text, so the pilot must use public, non-sensitive material.
-
-See [acceptance and remaining work](docs/ACCEPTANCE.md) and [integration setup](docs/INTEGRATION.md).
-
-## Architecture
-
-- `src/` — responsive workspace, role-guided actions, wallet sign-in and GenLayer writes.
-- `server/domain.mjs` — case state transitions and authorization.
-- `server/store.mjs` — SQLite transactions, durable event history and fulfillment state.
-- `server/chain.mjs` — finalized-state verification and contract/operator binding.
-- `server/integration.mjs` — authenticated external reads, execution and reconciliation.
-- `contracts/` — immutable evidence and independently assessed GenLayer decisions.
-- `tests/` — state-machine, replay, authentication and HTTP workflow regressions.
-
-Run checks with `npm run check` and `python -m py_compile contracts/*.py`.
-
-The server requires a persistent filesystem for SQLite. Use a single application deployment with a durable disk, or migrate storage before using an ephemeral serverless host. Deployment URLs and on-chain transaction hashes will be added only after verification.
+Read [acceptance and remaining gaps](docs/ACCEPTANCE.md). Real WooCommerce and GenLayer execution remains an explicit milestone, not a completed feature.
