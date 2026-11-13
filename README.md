@@ -27,3 +27,7 @@ Open http://127.0.0.1:4200. Loopback only. Persistent demo DB: `data/swapback.sq
 API: `GET /api/state`, `POST /api/cases`, `GET /api/cases/:id`, `POST /api/cases/:id/respond|freeze|decide|choose|receive|fulfill`.
 
 Read [acceptance and remaining gaps](docs/ACCEPTANCE.md). Real WooCommerce and GenLayer execution remains an explicit milestone, not a completed feature.
+
+## Contract source
+
+A non-deployed GenLayer Intelligent Contract source draft is included at [contracts/ExchangeCourt.py](contracts/ExchangeCourt.py). It requires GenVM validation, deployment, independent consensus and API wiring. See [contract verification notes](docs/GENLAYER.md).
